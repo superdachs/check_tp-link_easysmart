@@ -42,6 +42,7 @@ class Plugin():
         self.password = password
         self.mode = mode
 
+
     def check(self):
         return getattr(self, 'check_%s' % self.mode)()
 
@@ -50,20 +51,22 @@ class Plugin():
 
         return 0, 'text', 'perf'
 
-    def make_request(self, target):
-        try:
-            result = requests.get('http://%s/%s' % (self.hostaddress, target),
-                                auth=HTTPBasicAuth(self.username, self.password))
-            if int(result.status_code) == 401:
-                raise Exception('authorization failed, check username and password')
-            if int(result.status_code) != 200:
-                raise Exception('unknown error, check compatibility list')
-        except ConnectionError:
-            print('UNKNOW: connection error, check host address')
-            sys.exit(3)
-        except Exception as e:
-            print('UNKNOWN: %s' % e.message)
-            sys.exit(3)
+    def make_request(self, target=None):
+        url = 'http://%s' % self.hostaddress
+        if target:
+            url += '/%s' % target
+        with requests.Session() as session:
+            #TODO: make fucking login first, but how?
+            try:
+                result = requests.get(url)
+                if int(result.status_code) != 200:
+                    raise Exception('unknown error, check compatibility list')
+            except ConnectionError:
+                print('UNKNOW: connection error, check host address')
+                sys.exit(3)
+            except Exception as e:
+                print('UNKNOWN: %s' % e.message)
+                sys.exit(3)
         return result.text
 
 # ConnectionError falsche ip
