@@ -23,6 +23,3 @@ check_tp-link_easysmart.py -H $HOSTADDRESS$ -U $ARG1$ -P $ARG2$ -M errors -w 10 
 ```
 This checks the error counts for send and receive since last check. Returns warning for > 10 errors (tx or rx) and critical for 15 errors (tx or rx).
 
-```bash
-check_tp-link_easysmart.py -H $HOSTADDRESS$ -U $ARG1$ -P $ARG2$ -M errors -w 10 -c 15 --html
-```
