@@ -33,6 +33,7 @@ import re
 
 CHECK_MODES = [
     'overview',
+    'errors',
 ]
 
 NAGIOS_STATS = {
@@ -62,36 +63,72 @@ LINK_STATES = {
 
 class Plugin():
 
-    def __init__(self, hostaddress, username, password, mode, html):
+    def __init__(self, hostaddress, username, password, mode, html, ports, warning, critical):
         self.hostaddress = hostaddress
         self.username = username
         self.password = password
         self.mode = mode
         self.html = html
+        self.ports = ports
+        self.warning = warning
+        self.critical = critical
+        self.statistics = self.get_statistics()
 
 
     def check(self):
         return getattr(self, 'check_%s' % self.mode)()
 
-    def check_overview(self):
-        statistics = self.get_statistics()
+    def check_errors(self):
         text = ''
         perf = ''
-        for port in statistics:
-            text += 'port %d %s (%s) TX OK: %d TX ERR: %d RX OK: %d RX ERR: %d' % (port['port'],
-                                                   port['state'],
-                                                   port['link'],
-                                                   port['tx_ok'],
-                                                   port['tx_err'],
-                                                   port['rx_ok'],
-                                                   port['rx_err']
-                                                   )
-            if self.html:
-                text += '</br>'
-            else:
-                text += '\n'
-            for element in ['tx_ok', 'tx_err', 'rx_ok', 'rx_err']:
-                perf += 'port_%s_%s=%d ' % (port['port'], element, port[element])
+        for port in self.statistics:
+            overall_status = 0
+            if self.ports == 'all' or str(port['port']) in self.ports:
+                port_nagios_status = 0
+                if port['tx_err'] > self.warning or port['rx_err'] > self.warning:
+                    port_nagios_status = 1
+                if port['tx_err'] > self.critical or port['rx_err'] > self.critical:
+                    port_nagios_status = 2
+                if overall_status < port_nagios_status:
+                    overall_status = port_nagios_status
+                text += 'port %d %s (%s) TX OK: %d TX ERR: %d RX OK: %d RX ERR: %d (%s)' % (port['port'],
+                                                       port['state'],
+                                                       port['link'],
+                                                       port['tx_ok'],
+                                                       port['tx_err'],
+                                                       port['rx_ok'],
+                                                       port['rx_err'],
+                                                       NAGIOS_STATS[port_nagios_status]
+                                                       )
+                if self.html:
+                    text += '</br>'
+                else:
+                    text += '\n'
+                for element in ['tx_ok', 'tx_err', 'rx_ok', 'rx_err']:
+                    perf += 'port_%s_%s=%d ' % (port['port'], element, port[element])
+        text = text.strip('\n')
+        perf = perf.strip(' ')
+        return overall_status, text, perf
+
+    def check_overview(self):
+        text = ''
+        perf = ''
+        for port in self.statistics:
+            if self.ports == 'all' or str(port['port']) in self.ports:
+                text += 'port %d %s (%s) TX OK: %d TX ERR: %d RX OK: %d RX ERR: %d' % (port['port'],
+                                                       port['state'],
+                                                       port['link'],
+                                                       port['tx_ok'],
+                                                       port['tx_err'],
+                                                       port['rx_ok'],
+                                                       port['rx_err']
+                                                       )
+                if self.html:
+                    text += '</br>'
+                else:
+                    text += '\n'
+                for element in ['tx_ok', 'tx_err', 'rx_ok', 'rx_err']:
+                    perf += 'port_%s_%s=%d ' % (port['port'], element, port[element])
         text = text.strip('\n')
         perf = perf.strip(' ')
         return 0, text, perf
@@ -165,10 +202,31 @@ def main():
     argp.add_argument('-P', '--password', help='the password of the administrative web gui user')
     argp.add_argument('-M', '--mode', help='check mode, available modes are: %s' % ', '.join(CHECK_MODES))
     argp.add_argument('--html', default=False, action='store_true', help='enable html formatted output')
+    argp.add_argument('-p', '--ports', default='all', help='comma separated list of ports to check')
+    argp.add_argument('-w', '--warning', default='10', help='send and receive warning error count since last check')
+    argp.add_argument('-c', '--critical', default='20', help='send and receive critical error count since last check')
     args = argp.parse_args()
 
+    if args.mode not in CHECK_MODES:
+        print('UNKNOWN: check mode has to be one of: %s' % ' '.join(CHECK_MODES))
+        sys.exit(3)
+
+    try:
+        int(args.warning)
+        int(args.critical)
+    except ValueError:
+        print('UNKNOWN: warning and critical thresholds have to be numbers')
+        sys.exit(3)
+
+
+    if args.ports != 'all':
+        if not re.match('^(\d+\,{1})*\d+$', args.ports):
+            print('UNKNOWN: ports must be given as comma separated list')
+            sys.exit(3)
+
     plugin = Plugin(hostaddress=args.hostaddress, username=args.username,
-                    password=args.password, mode=args.mode, html=args.html)
+                    password=args.password, mode=args.mode, html=args.html, ports=args.ports,
+                    warning=args.warning, critical=args.critical)
     result_code, result_text, result_perfdata = plugin.check()
     print('%s: %s|%s' % (NAGIOS_STATS[result_code], result_text, result_perfdata))
     sys.exit(result_code)
