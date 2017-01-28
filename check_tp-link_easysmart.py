@@ -30,6 +30,8 @@ from requests.auth import HTTPBasicAuth
 import argparse
 import sys
 import re
+import hashlib
+import os
 
 CHECK_MODES = [
     'overview',
@@ -63,7 +65,9 @@ LINK_STATES = {
 
 class Plugin():
 
-    def __init__(self, hostaddress, username, password, mode, html, ports, warning, critical):
+    def __init__(self, hostaddress, username, password,
+                 mode, html, ports, warning,
+                 critical, service_fingerprint):
         self.hostaddress = hostaddress
         self.username = username
         self.password = password
@@ -72,6 +76,7 @@ class Plugin():
         self.ports = ports
         self.warning = warning
         self.critical = critical
+        self.service_fingerprint = service_fingerprint
         self.statistics = self.get_statistics()
 
 
@@ -79,33 +84,54 @@ class Plugin():
         return getattr(self, 'check_%s' % self.mode)()
 
     def check_errors(self):
+        oldcheck = None
+        try:
+            with open('/tmp/check_%s.tmp' % self.service_fingerprint, 'r') as f:
+                oldcheck = f.readlines()
+        except IOError:
+            with open('/tmp/check_%s.tmp' % self.service_fingerprint, 'w') as f:
+                for element in self.statistics:
+                    f.write('%s,%s,%s,%s\n' % (element['tx_ok'], element['tx_err'], element['rx_ok'], element['rx_err']))
+                print('UNKNOWN: temp file not found, if this is the first check, everything is ok')
+                sys.exit(3)
+
         text = ''
         perf = ''
+        overall_status = 0
+        i = -1
         for port in self.statistics:
-            overall_status = 0
-            if self.ports == 'all' or str(port['port']) in self.ports:
-                port_nagios_status = 0
-                if port['tx_err'] > self.warning or port['rx_err'] > self.warning:
-                    port_nagios_status = 1
-                if port['tx_err'] > self.critical or port['rx_err'] > self.critical:
-                    port_nagios_status = 2
-                if overall_status < port_nagios_status:
-                    overall_status = port_nagios_status
-                text += 'port %d %s (%s) TX OK: %d TX ERR: %d RX OK: %d RX ERR: %d (%s)' % (port['port'],
-                                                       port['state'],
-                                                       port['link'],
-                                                       port['tx_ok'],
-                                                       port['tx_err'],
-                                                       port['rx_ok'],
-                                                       port['rx_err'],
-                                                       NAGIOS_STATS[port_nagios_status]
-                                                       )
-                if self.html:
-                    text += '</br>'
-                else:
-                    text += '\n'
-                for element in ['tx_ok', 'tx_err', 'rx_ok', 'rx_err']:
-                    perf += 'port_%s_%s=%d ' % (port['port'], element, port[element])
+            i += 1
+            try:
+                tx_ok = port['tx_ok'] - int(oldcheck[i].split(',')[0])
+                tx_err = port['tx_err'] - int(oldcheck[i].split(',')[1])
+                rx_ok = port['rx_ok'] - int(oldcheck[i].split(',')[2])
+                rx_err = port['rx_err'] - int(oldcheck[i].split(',')[3])
+            except IndexError:
+                print('UNKNOWN: temp file is corrupt, deleting')
+                os.remove('/tmp/check_%s.tmp' % self.service_fingerprint)
+                sys.exit(3)
+            port_nagios_status = 0
+            if tx_err  > self.warning or rx_err > self.warning:
+                port_nagios_status = 1
+            if tx_err > self.critical or rx_err > self.critical:
+                port_nagios_status = 2
+            if overall_status < port_nagios_status:
+                overall_status = port_nagios_status
+            text += 'port %d %s (%s) TX OK: %d TX ERR: %d RX OK: %d RX ERR: %d (%s)' % (port['port'],
+                                                   port['state'],
+                                                   port['link'],
+                                                   tx_ok,
+                                                   tx_err,
+                                                   rx_ok,
+                                                   rx_err,
+                                                   NAGIOS_STATS[port_nagios_status]
+                                                   )
+            if self.html:
+                text += '</br>'
+            else:
+                text += '\n'
+            for element in [['tx_ok', tx_ok], ['tx_err', tx_err], ['rx_ok', rx_ok], ['rx_err', rx_err]]:
+                perf += 'port_%s_%s=%d ' % (port['port'], element[0], element[1])
         text = text.strip('\n')
         perf = perf.strip(' ')
         return overall_status, text, perf
@@ -114,21 +140,20 @@ class Plugin():
         text = ''
         perf = ''
         for port in self.statistics:
-            if self.ports == 'all' or str(port['port']) in self.ports:
-                text += 'port %d %s (%s) TX OK: %d TX ERR: %d RX OK: %d RX ERR: %d' % (port['port'],
-                                                       port['state'],
-                                                       port['link'],
-                                                       port['tx_ok'],
-                                                       port['tx_err'],
-                                                       port['rx_ok'],
-                                                       port['rx_err']
-                                                       )
-                if self.html:
-                    text += '</br>'
-                else:
-                    text += '\n'
-                for element in ['tx_ok', 'tx_err', 'rx_ok', 'rx_err']:
-                    perf += 'port_%s_%s=%d ' % (port['port'], element, port[element])
+            text += 'port %d %s (%s) TX OK: %d TX ERR: %d RX OK: %d RX ERR: %d' % (port['port'],
+                                                   port['state'],
+                                                   port['link'],
+                                                   port['tx_ok'],
+                                                   port['tx_err'],
+                                                   port['rx_ok'],
+                                                   port['rx_err']
+                                                   )
+            if self.html:
+                text += '</br>'
+            else:
+                text += '\n'
+            for element in ['tx_ok', 'tx_err', 'rx_ok', 'rx_err']:
+                perf += 'port_%s_%s=%d ' % (port['port'], element, port[element])
         text = text.strip('\n')
         perf = perf.strip(' ')
         return 0, text, perf
@@ -145,15 +170,16 @@ class Plugin():
         port_statistics = [port_statistics[i:i+4] for i in range(0, len(port_statistics), 4)]
         statistics = []
         for i in range(len(port_states)):
-            statistics.append({
-                'port': i + 1,
-                'state': PORT_STATES[port_states[i]],
-                'link': LINK_STATES[port_links[i]],
-                'tx_ok': port_statistics[i][0],
-                'tx_err': port_statistics[i][1],
-                'rx_ok': port_statistics[i][2],
-                'rx_err': port_statistics[i][3],
-            })
+            if str(i + 1) in self.ports or self.ports == 'all':
+                statistics.append({
+                    'port': i + 1,
+                    'state': PORT_STATES[port_states[i]],
+                    'link': LINK_STATES[port_links[i]],
+                    'tx_ok': port_statistics[i][0],
+                    'tx_err': port_statistics[i][1],
+                    'rx_ok': port_statistics[i][2],
+                    'rx_err': port_statistics[i][3],
+                })
         self.logout()
         return statistics
 
@@ -207,6 +233,10 @@ def main():
     argp.add_argument('-c', '--critical', default='20', help='send and receive critical error count since last check')
     args = argp.parse_args()
 
+    md5 = hashlib.md5()
+    md5.update(str(args))
+    service_fingerprint = md5.hexdigest()
+
     if args.mode not in CHECK_MODES:
         print('UNKNOWN: check mode has to be one of: %s' % ' '.join(CHECK_MODES))
         sys.exit(3)
@@ -218,7 +248,6 @@ def main():
         print('UNKNOWN: warning and critical thresholds have to be numbers')
         sys.exit(3)
 
-
     if args.ports != 'all':
         if not re.match('^(\d+\,{1})*\d+$', args.ports):
             print('UNKNOWN: ports must be given as comma separated list')
@@ -226,7 +255,7 @@ def main():
 
     plugin = Plugin(hostaddress=args.hostaddress, username=args.username,
                     password=args.password, mode=args.mode, html=args.html, ports=args.ports,
-                    warning=args.warning, critical=args.critical)
+                    warning=args.warning, critical=args.critical, service_fingerprint=service_fingerprint)
     result_code, result_text, result_perfdata = plugin.check()
     print('%s: %s|%s' % (NAGIOS_STATS[result_code], result_text, result_perfdata))
     sys.exit(result_code)
