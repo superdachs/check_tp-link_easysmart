@@ -110,6 +110,10 @@ class Plugin():
                 print('UNKNOWN: temp file is corrupt, deleting')
                 os.remove('/tmp/check_%s.tmp' % self.service_fingerprint)
                 sys.exit(3)
+            with open('/tmp/check_%s.tmp' % self.service_fingerprint, 'w') as f:
+                for element in self.statistics:
+                    f.write('%s,%s,%s,%s\n' % (element['tx_ok'], element['tx_err'], element['rx_ok'], element['rx_err']))
+
             port_nagios_status = 0
             if tx_err  > self.warning or rx_err > self.warning:
                 port_nagios_status = 1
