@@ -47,7 +47,7 @@ def check_easysmart_ports(item, params, info):
     tmpfilename = '/tmp/easysmart_%s' % hostaddress
     ret = None
     try:
-        with open(tmpfilename, r) as f:
+        with open(tmpfilename, 'r') as f:
             for line in f.readlines():
                 oldlines.append(line.split())
     except IOError:
