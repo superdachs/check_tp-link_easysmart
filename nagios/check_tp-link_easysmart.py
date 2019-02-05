@@ -218,7 +218,7 @@ class Plugin():
         return result.text
 
 def main():
-    '''main function configures baseic stuff, parse and check arguments and initializes check'''
+    '''main function configures basic stuff, parse and check arguments and initializes check'''
     argp = argparse.ArgumentParser()
     argp.add_argument('-H', '--hostaddress', help='the ip address or hostname of the switch')
     argp.add_argument('-U', '--username', help='the username of the administrative web gui user')
