@@ -25,7 +25,22 @@ def inventory_easysmart_ports(info):
 
 
 def check_easysmart_ports(item, params, info):
-    return 3, "Sorry - not implemented"
+    # enabled ports with down state returning critical
+    # ports with error > ok return critical
+    # ports with error > 0 return warning
+    for line in info:
+        if line[0] == item:
+            if int(line[3]) < 2:
+                return 2, "Port link is %s" % line[4].replace('_', ' ')
+            if int(line[6]) > int(line[5]):
+                return 2, "TX ERROR > TX OK"
+            if int(line[8]) > int(line[7]):
+                return 2, "RX ERROR > RX OK"
+            if int(line[6]) > 0:
+                return 1, "TX ERROR > 0"
+            if int(line[8]) > 0:
+                return 1, "RX ERROR > 0"
+            return 0, "PORT %s OK %s" % (line[0], line[4])
 
 
 check_info["easysmart.ports"] = {
