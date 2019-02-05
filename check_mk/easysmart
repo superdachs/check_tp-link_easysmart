@@ -70,22 +70,12 @@ def check_easysmart_ports(item, params, info):
     except IndexError:
         os.remove(tmpfilename)
         return 2, "tempfile was corrupt, deleted"
-    try:
-        tx_ok = info_dict[item]['tx_ok'] - old_info_dict[item]['tx_ok']
-    except:
-        tx_ok = 0
-    try:
-        tx_err = info_dict[item]['tx_err'] - old_info_dict[item]['tx_err']
-    except:
-        tx_err = 0
-    try:
-        rx_ok = info_dict[item]['rx_ok'] - old_info_dict[item]['rx_ok']
-    except:
-        rx_ok = 0
-    try:
-        rx_err = info_dict[item]['rx_err'] - old_info_dict[item]['rx_err']
-    except:
-        rx_err = 0
+
+    tx_ok = info_dict[item]['tx_ok'] - old_info_dict[item]['tx_ok']
+    tx_err = info_dict[item]['tx_err'] - old_info_dict[item]['tx_err']
+    rx_ok = info_dict[item]['rx_ok'] - old_info_dict[item]['rx_ok']
+    rx_err = info_dict[item]['rx_err'] - old_info_dict[item]['rx_err']
+
     statistics = " - %s - TX_OK: %s TX_ERR: %s RX_OK: %s RX_ERR %s" % (
     info_dict[item]['link_name'], tx_ok, tx_err, rx_ok, rx_err)
     if tx_err > tx_ok:
