@@ -91,22 +91,29 @@ def check_easysmart_ports(item, params, info):
             v['rx_ok'], v['rx_err'], info[0][9])
             f.write(line)
 
+    perfdata = [
+        ('tx_ok', tx_ok),
+        ('tx_err', tx_err),
+        ('rx_ok', rx_ok),
+        ('rx_err', rx_err)
+    ]
+
     statistics = " - %s - TX_OK: %s TX_ERR: %s RX_OK: %s RX_ERR %s" % (
         info_dict[item]['link_name'], tx_ok, tx_err, rx_ok, rx_err)
     if tx_err > tx_ok:
-        return 2, "CRITICAL TX ERROR > TX OK" + statistics
+        return 2, "CRITICAL TX ERROR > TX OK" + statistics, perfdata
     if rx_err > rx_ok:
-        return 2, "CRITICAL RX ERROR > RX OK" + statistics
+        return 2, "CRITICAL RX ERROR > RX OK" + statistics, perfdata
     if tx_err > 0:
-        return 1, "WARNING TX ERROR > 0" + statistics
+        return 1, "WARNING TX ERROR > 0" + statistics, perfdata
     if rx_err > 0:
-        return 1, "WARNING RX ERROR > 0" + statistics
-    return 0, "OK" + statistics
+        return 1, "WARNING RX ERROR > 0" + statistics, perfdata
+    return 0, "OK" + statistics, perfdata
 
 
 check_info["easysmart.ports"] = {
     'check_function': check_easysmart_ports,
     'inventory_function': inventory_easysmart_ports,
     'service_description': 'status and statistics of port %s',
-    'has_perfdata': False,
+    'has_perfdata': True,
 }
