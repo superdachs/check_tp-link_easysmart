@@ -61,7 +61,7 @@ def check_easysmart_ports(item, params, info):
 
     info_dict = convert_info(info)
     if info_dict[item]['link'] < 2:
-        return 2, "Port link is %s" % info_dict[item]['state_name']
+        return 2, "Port is %s but link is %s" % (info_dict[item]['state_name'], info_dict[item]['link_name'])
 
     try:
         old_info_dict = convert_info(oldlines)
