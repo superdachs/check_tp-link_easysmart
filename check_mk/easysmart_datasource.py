@@ -118,9 +118,9 @@ class DatasourcePlugin():
         print("<<<easysmart>>>")
         for i in statistics:
             print(
-                "%s %s %s %s %s %s %s %s %s" % (
+                "%s %s %s %s %s %s %s %s %s %s" % (
                 i['port'], i['state'], PORT_STATES[i['state']].replace(' ', '_'), i['link'],
-                LINK_STATES[i['link']].replace(' ', '_'), i['tx_ok'], i['tx_err'], i['rx_ok'], i['rx_err']))
+                LINK_STATES[i['link']].replace(' ', '_'), i['tx_ok'], i['tx_err'], i['rx_ok'], i['rx_err'], self.hostaddress))
 
             self.logout()
 

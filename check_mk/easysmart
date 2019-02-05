@@ -14,6 +14,7 @@
 #
 #     You should have received a copy of the GNU General Public License
 #     along with check_tp-link_easysmart.  If not, see <http://www.gnu.org/licenses/>.
+import os
 
 
 def inventory_easysmart_ports(info):
@@ -22,24 +23,80 @@ def inventory_easysmart_ports(info):
             yield line[0], None
 
 
-def check_easysmart_ports(item, params, info):
-    # enabled ports with down state returning critical
-    # ports with error > ok return critical
-    # ports with error > 0 return warning
+def convert_info(info):
+    info_dict = {}
     for line in info:
-        if line[0] == item:
-            if int(line[3]) < 2:
-                return 2, "Port link is %s" % line[4].replace('_', ' ')
-            statistics = " - %s - TX_OK: %s TX_ERR: %s RX_OK: %s RX_ERR %s" % (line[4].replace('_', ' '), line[5], line[6], line[7], line[8])
-            if int(line[6]) > int(line[5]):
-                return 2, "TX ERROR > TX OK" + statistics
-            if int(line[8]) > int(line[7]):
-                return 2, "RX ERROR > RX OK" + statistics
-            if int(line[6]) > 0:
-                return 1, "TX ERROR > 0" + statistics
-            if int(line[8]) > 0:
-                return 1, "RX ERROR > 0" + statistics
-            return 0, "OK" + statistics
+        info_dict.update({
+            line[0]: {
+                'state': line[1],
+                'state_name': line[2].replace('_', ' '),
+                'link': line[3],
+                'link_name': line[4].replace('_', ' '),
+                'tx_ok': line[5],
+                'tx_err': line[6],
+                'rx_ok': line[7],
+                'rx_err': line[8],
+            }
+        })
+    return info_dict
+
+
+def check_easysmart_ports(item, params, info):
+    oldlines = []
+    hostaddress = info[0][9]
+    tmpfilename = '/tmp/easysmart_%s' % hostaddress
+    ret = None
+    try:
+        with open(tmpfilename, r) as f:
+            for line in f.readlines():
+                oldlines.append(line.split())
+    except IOError:
+        ret = 3, 'no temp file found, check must run twice for calculation'
+    try:
+        with open(tmpfilename, 'w') as f:
+            for line in info:
+                f.write(' '.join(line))
+    except IOError:
+        ret = 3, "can't write temp file, check permissions"
+    if ret:
+        return ret
+
+    info_dict = convert_info(info)
+    if info_dict[item]['state'] < 1:
+        return 2, "Port link is %s" % info_dict[item]['state_name']
+
+    try:
+        old_info_dict = convert_info(oldlines)
+    except IndexError:
+        os.remove(tmpfilename)
+        return 2, "tempfile was corrupt, deleted"
+    try:
+        tx_ok = info_dict[item]['tx_ok'] - old_info_dict[item]['tx_ok']
+    except:
+        tx_ok = 0
+    try:
+        tx_err = info_dict[item]['tx_err'] - old_info_dict[item]['tx_err']
+    except:
+        tx_err = 0
+    try:
+        rx_ok = info_dict[item]['rx_ok'] - old_info_dict[item]['rx_ok']
+    except:
+        rx_ok = 0
+    try:
+        rx_err = info_dict[item]['rx_err'] - old_info_dict[item]['rx_err']
+    except:
+        rx_err = 0
+    statistics = " - %s - TX_OK: %s TX_ERR: %s RX_OK: %s RX_ERR %s" % (
+    info_dict[item]['link_name'], tx_ok, tx_err, rx_ok, rx_err)
+    if tx_err > tx_ok:
+        return 2, "CRITICAL TX ERROR > TX OK" + statistics
+    if rx_err > rx_ok:
+        return 2, "CRITICAL RX ERROR > RX OK" + statistics
+    if tx_err > 0:
+        return 1, "WARNING TX ERROR > 0" + statistics
+    if rx_err > 0:
+        return 1, "WARNING RX ERROR > 0" + statistics
+    return 0, "OK" + statistics
 
 
 check_info["easysmart.ports"] = {
