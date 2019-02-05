@@ -55,7 +55,7 @@ def check_easysmart_ports(item, params, info):
     try:
         with open(tmpfilename, 'w') as f:
             for line in info:
-                f.write(' '.join(line))
+                f.write(' '.join(line) + "\n")
     except IOError:
         ret = 3, "can't write temp file, check permissions"
     if ret:
