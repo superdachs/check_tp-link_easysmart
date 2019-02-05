@@ -25,7 +25,7 @@ def check_easysmart_ports(item, params, info):
     return 3, "Sorry - not implemented"
 
 
-check_info["easysmart_ports"] = {
+check_info["easysmart.ports"] = {
     'check_function': check_easysmart_ports,
     'inventory_function': inventory_easysmart_ports,
     'service_description': 'status and statistics of port %s',
