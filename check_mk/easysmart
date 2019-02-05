@@ -45,7 +45,6 @@ def check_easysmart_ports(item, params, info):
     oldlines = []
     hostaddress = info[0][9]
     tmpfilename = '/tmp/easysmart_%s' % hostaddress
-    ret = None
     try:
         with open(tmpfilename, 'r') as f:
             for line in f.readlines():
@@ -80,7 +79,7 @@ def check_easysmart_ports(item, params, info):
     with open(tmpfilename, 'w') as f:
         for k, v in old_info_dict.items():
             line = "%s %s %s %s %s %s %s %s %s %s\n" % (
-            str(k), str(v['state']), v['state_name'], str(v['link']), v['link_name'], v['tx_ok'], v['tx_err'],
+            str(k), str(v['state']), v['state_name'].replace(' ', '_'), str(v['link']), v['link_name'].replace(' ', '_'), v['tx_ok'], v['tx_err'],
             v['rx_ok'], v['rx_err'], info[0][9])
             print(line)
             f.write(line)
