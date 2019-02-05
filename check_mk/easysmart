@@ -28,14 +28,14 @@ def convert_info(info):
     for line in info:
         info_dict.update({
             line[0]: {
-                'state': line[1],
+                'state': int(line[1]),
                 'state_name': line[2].replace('_', ' '),
-                'link': line[3],
+                'link': int(line[3]),
                 'link_name': line[4].replace('_', ' '),
-                'tx_ok': line[5],
-                'tx_err': line[6],
-                'rx_ok': line[7],
-                'rx_err': line[8],
+                'tx_ok': int(line[5]),
+                'tx_err': int(line[6]),
+                'rx_ok': int(line[7]),
+                'rx_err': int(line[8]),
             }
         })
     return info_dict
