@@ -30,15 +30,16 @@ def check_easysmart_ports(item, params, info):
         if line[0] == item:
             if int(line[3]) < 2:
                 return 2, "Port link is %s" % line[4].replace('_', ' ')
+            statistics = " - %s - TX_OK: %s TX_ERR: %s RX_OK: %s RX_ERR %s" % (line[4], line[5], line[6], line[7], line[8])
             if int(line[6]) > int(line[5]):
-                return 2, "TX ERROR > TX OK"
+                return 2, "TX ERROR > TX OK" + statistics
             if int(line[8]) > int(line[7]):
-                return 2, "RX ERROR > RX OK"
+                return 2, "RX ERROR > RX OK" + statistics
             if int(line[6]) > 0:
-                return 1, "TX ERROR > 0"
+                return 1, "TX ERROR > 0" + statistics
             if int(line[8]) > 0:
-                return 1, "RX ERROR > 0"
-            return 0, "PORT %s OK %s" % (line[0], line[4])
+                return 1, "RX ERROR > 0" + statistics
+            return 0, "OK" + statistics
 
 
 check_info["easysmart.ports"] = {
