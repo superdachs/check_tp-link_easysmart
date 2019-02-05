@@ -52,13 +52,12 @@ def check_easysmart_ports(item, params, info):
                 oldlines.append(line.split())
     except IOError:
         ret = 3, 'no temp file found, check must run twice for calculation'
-    try:
-        with open(tmpfilename, 'w') as f:
-            for line in info:
-                f.write(' '.join(line) + "\n")
-    except IOError:
-        ret = 3, "can't write temp file, check permissions"
-    if ret:
+        try:
+            with open(tmpfilename, 'w') as f:
+                for line in info:
+                    f.write(' '.join(line) + "\n")
+        except IOError:
+            ret = 3, "can't write temp file, check permissions"
         return ret
 
     info_dict = convert_info(info)
@@ -76,8 +75,16 @@ def check_easysmart_ports(item, params, info):
     rx_ok = info_dict[item]['rx_ok'] - old_info_dict[item]['rx_ok']
     rx_err = info_dict[item]['rx_err'] - old_info_dict[item]['rx_err']
 
+    # write only data of this item to temp file
+    old_info_dict[item] = info_dict[item]
+    with open(tmpfilename, 'w') as f:
+        for k, v in old_info_dict.items():
+            f.write("%s %s %s %s %s %s %s %s %s %s\n" % (
+            str(k), str(v['state']), v['state_name'], str(v['link']), v['link_name'], v['tx_ok'], v['tx_err'],
+            v['rx_ok'], v['rx_err'], info[0][9]))
+
     statistics = " - %s - TX_OK: %s TX_ERR: %s RX_OK: %s RX_ERR %s" % (
-    info_dict[item]['link_name'], tx_ok, tx_err, rx_ok, rx_err)
+        info_dict[item]['link_name'], tx_ok, tx_err, rx_ok, rx_err)
     if tx_err > tx_ok:
         return 2, "CRITICAL TX ERROR > TX OK" + statistics
     if rx_err > rx_ok:
