@@ -115,7 +115,7 @@ class DatasourcePlugin():
         log.debug(statistics)
 
         # FORMAT: PORT STATE STATE_NAME LINK LINK_NAME TX_OK TX_ERR RX_OK RX_ERR
-        print("<<<ports>>>")
+        print("<<<easysmart>>>")
         for i in statistics:
             print(
                 "%s %s %s %s %s %s %s %s %s" % (
