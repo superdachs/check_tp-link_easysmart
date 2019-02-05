@@ -17,8 +17,9 @@
 
 
 def inventory_easysmart_ports(info):
-    print(info)
-    return []
+    for line in info:
+        if int(line[1]) == 1:
+            yield line[0], None
 
 
 def check_easysmart_ports(item, params, info):
