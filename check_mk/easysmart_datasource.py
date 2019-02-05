@@ -72,12 +72,12 @@ class DatasourcePlugin():
             sys.exit(1)
 
     def logout(self):
-        self.session.get(f'http://%s/Logout.htm' % self.hostaddress)
+        self.session.get('http://%s/Logout.htm' % self.hostaddress)
 
     def make_request(self, target=None):
-        url = f'http://%s' % self.hostaddress
+        url = 'http://%s' % self.hostaddress
         if target:
-            url += f'/%s' % target
+            url += '/%s' % target
         try:
             result = self.session.get(url)
             if int(result.status_code) != 200:
