@@ -62,8 +62,8 @@ class DatasourcePlugin():
             'logon': 'Login',
         }
         try:
-            self.session.post(f'http://{self.hostaddress}/logon.cgi', data=login_payload)
-            check_login_response = self.session.get(f'http://{self.hostaddress}/')
+            self.session.post('http://%s/logon.cgi' % self.hostaddress, data=login_payload)
+            check_login_response = self.session.get('http://%s/' % self.hostaddress)
             if int(check_login_response.status_code) != 200:
                 print('UNKNOWN: login incorrect, check username and password')
                 sys.exit(1)
@@ -72,21 +72,21 @@ class DatasourcePlugin():
             sys.exit(1)
 
     def logout(self):
-        self.session.get(f'http://{self.hostaddress}/Logout.htm')
+        self.session.get(f'http://%s/Logout.htm' % self.hostaddress)
 
     def make_request(self, target=None):
-        url = f'http://{self.hostaddress}'
+        url = f'http://%s' % self.hostaddress
         if target:
-            url += f'/{target}'
+            url += f'/%s' % target
         try:
             result = self.session.get(url)
             if int(result.status_code) != 200:
                 raise Exception('unknown error, check compatibility list')
-        except ConnectionError as e:
+        except ConnectionError:
             print('UNKNOWN: connection error, check host address')
             sys.exit(1)
-        except Exception as e:
-            print(f'UNKNOWN: {e}')
+        except Exception:
+            print('UNKNOWN')
             sys.exit(1)
         return result.text
 
@@ -118,11 +118,11 @@ class DatasourcePlugin():
         print("<<<ports>>>")
         for i in statistics:
             print(
-                f"{i['port']} {i['state']} {PORT_STATES[i['state']].replace(' ', '_')} {i['link']} "
-                f"{LINK_STATES[i['link']].replace(' ', '_')} {i['tx_ok']} "
-                f"{i['tx_err']} {i['rx_ok']} {i['rx_err']}")
+                "%s %s %s %s %s %s %s %s %s" % (
+                i['port'], i['state'], PORT_STATES[i['state']].replace(' ', '_'), i['link'],
+                LINK_STATES[i['link']].replace(' ', '_'), i['tx_ok'], i['tx_err'], i['rx_ok'], i['rx_err']))
 
-        self.logout()
+            self.logout()
 
 
 def main():
@@ -141,4 +141,3 @@ def main():
 if __name__ == "__main__":
     main()
     sys.exit(0)
-
