@@ -18,6 +18,8 @@
 
 def inventory_easysmart_ports(info):
     for line in info:
+        print('Inventory called')
+        print(info)
         if int(line[1]) == 1:
             yield line[0], None
 
