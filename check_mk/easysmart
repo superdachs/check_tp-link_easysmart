@@ -79,9 +79,11 @@ def check_easysmart_ports(item, params, info):
     old_info_dict[item] = info_dict[item]
     with open(tmpfilename, 'w') as f:
         for k, v in old_info_dict.items():
-            f.write("%s %s %s %s %s %s %s %s %s %s\n" % (
+            line = "%s %s %s %s %s %s %s %s %s %s\n" % (
             str(k), str(v['state']), v['state_name'], str(v['link']), v['link_name'], v['tx_ok'], v['tx_err'],
-            v['rx_ok'], v['rx_err'], info[0][9]))
+            v['rx_ok'], v['rx_err'], info[0][9])
+            print(line)
+            f.write(line)
 
     statistics = " - %s - TX_OK: %s TX_ERR: %s RX_OK: %s RX_ERR %s" % (
         info_dict[item]['link_name'], tx_ok, tx_err, rx_ok, rx_err)
