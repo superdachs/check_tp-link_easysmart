@@ -60,7 +60,7 @@ def check_easysmart_ports(item, params, info):
         return ret
 
     info_dict = convert_info(info)
-    if info_dict[item]['state'] < 1:
+    if info_dict[item]['link'] < 2:
         return 2, "Port link is %s" % info_dict[item]['state_name']
 
     try:
@@ -70,9 +70,17 @@ def check_easysmart_ports(item, params, info):
         return 2, "tempfile was corrupt, deleted"
 
     tx_ok = info_dict[item]['tx_ok'] - old_info_dict[item]['tx_ok']
+    if tx_ok < 0:
+        tx_ok = info_dict[item]['tx_ok']
     tx_err = info_dict[item]['tx_err'] - old_info_dict[item]['tx_err']
+    if tx_err < 0:
+        tx_err = info_dict[item]['tx_err']
     rx_ok = info_dict[item]['rx_ok'] - old_info_dict[item]['rx_ok']
+    if rx_ok < 0:
+        rx_ok = info_dict[item]['rx_ok']
     rx_err = info_dict[item]['rx_err'] - old_info_dict[item]['rx_err']
+    if rx_err < 0:
+        rx_err = info_dict[item]['rx_err']
 
     # write only data of this item to temp file
     old_info_dict[item] = info_dict[item]
