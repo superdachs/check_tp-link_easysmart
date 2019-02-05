@@ -42,6 +42,10 @@ LINK_STATES = {
     6: '1000MBit Full Duplex',
 }
 
+opt_host = None
+opt_user = None
+opt_pass = None
+
 
 class DatasourcePlugin():
 
