@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 #     2019 Stefan Kauerauf <mail@stefankauerauf.de>
 #     last modified: 2/5/2019
@@ -17,14 +17,14 @@
 #     You should have received a copy of the GNU General Public License
 #     along with check_tp-link_easysmart.  If not, see <http://www.gnu.org/licenses/>.
 
-import requests
-from requests import ConnectionError
-from requests.auth import HTTPBasicAuth
 import argparse
 import sys
 import re
 import hashlib
 import os
+import requests
+from requests import ConnectionError
+from requests.auth import HTTPBasicAuth
 
 CHECK_MODES = [
     'overview',
@@ -53,7 +53,20 @@ LINK_STATES = {
     6: '1000MBit Full Duplex',
 }
 
+LINK_STATES_TO_INT = {
+    'down' : 0,
+    'unknown' : 0,
+    '10MBit Half Duplex'  : int(10E6),
+    '10MBit Full Duplex'  : int(10E6),
+    '100MBit Half Duplex' : int(100E6),
+    '100MBit Full Duplex' : int(100E6),
+    '1000MBit Full Duplex': int(1000E6),
+}
 
+PORT_STATES_TO_INT = {
+    'disabled' : int(0),
+    'enabled' : int(1),
+}
 
 
 class Plugin():
@@ -71,7 +84,8 @@ class Plugin():
         self.critical = critical
         self.service_fingerprint = service_fingerprint
         self.statistics = self.get_statistics()
-
+        self.info = self.get_info()
+        self.statistics_influxdb = self.get_statistics_influxdb()
 
     def check(self):
         return getattr(self, 'check_%s' % self.mode)()
@@ -108,21 +122,21 @@ class Plugin():
                     f.write('%s,%s,%s,%s\n' % (element['tx_ok'], element['tx_err'], element['rx_ok'], element['rx_err']))
 
             port_nagios_status = 0
-            if tx_err  > self.warning or rx_err > self.warning:
+            if tx_err > self.warning or rx_err > self.warning:
                 port_nagios_status = 1
             if tx_err > self.critical or rx_err > self.critical:
                 port_nagios_status = 2
             if overall_status < port_nagios_status:
                 overall_status = port_nagios_status
             text += 'port %d %s (%s) TX OK: %d TX ERR: %d RX OK: %d RX ERR: %d (%s)' % (port['port'],
-                                                   port['state'],
-                                                   port['link'],
-                                                   tx_ok,
-                                                   tx_err,
-                                                   rx_ok,
-                                                   rx_err,
-                                                   NAGIOS_STATS[port_nagios_status]
-                                                   )
+                                                                                        port['state'],
+                                                                                        port['link'],
+                                                                                        tx_ok,
+                                                                                        tx_err,
+                                                                                        rx_ok,
+                                                                                        rx_err,
+                                                                                        NAGIOS_STATS[port_nagios_status]
+                                                                                        )
             if self.html:
                 text += '</br>'
             else:
@@ -138,13 +152,13 @@ class Plugin():
         perf = ''
         for port in self.statistics:
             text += 'port %d %s (%s) TX OK: %d TX ERR: %d RX OK: %d RX ERR: %d' % (port['port'],
-                                                   port['state'],
-                                                   port['link'],
-                                                   port['tx_ok'],
-                                                   port['tx_err'],
-                                                   port['rx_ok'],
-                                                   port['rx_err']
-                                                   )
+                                                                                   port['state'],
+                                                                                   port['link'],
+                                                                                   port['tx_ok'],
+                                                                                   port['tx_err'],
+                                                                                   port['rx_ok'],
+                                                                                   port['rx_err']
+                                                                                   )
             if self.html:
                 text += '</br>'
             else:
@@ -158,11 +172,11 @@ class Plugin():
     def get_statistics(self):
         self.login()
         statistics_body = self.make_request('PortStatisticsRpm.htm')
-        port_states = [int(i) for i in re.search('state\:\[(.*)\]\,\n', statistics_body).group(1).split(',')]
+        port_states = [int(i) for i in re.search(r'state\:\[(.*)\]\,\n', statistics_body).group(1).split(',')]
         del port_states[-2:]
-        port_links = [int(i) for i in re.search('link_status\:\[(.*)\]\,\n', statistics_body).group(1).split(',')]
+        port_links = [int(i) for i in re.search(r'link_status\:\[(.*)\]\,\n', statistics_body).group(1).split(',')]
         del port_links[-2:]
-        port_statistics = [int(i) for i in re.search('pkts\:\[(.*)\]\n', statistics_body).group(1).split(',')]
+        port_statistics = [int(i) for i in re.search(r'pkts\:\[(.*)\]\n', statistics_body).group(1).split(',')]
         del port_statistics[-2:]
         port_statistics = [port_statistics[i:i+4] for i in range(0, len(port_statistics), 4)]
         statistics = []
@@ -179,6 +193,55 @@ class Plugin():
                 })
         self.logout()
         return statistics
+
+    def get_info(self):
+        self.login()
+        info_body = self.make_request('SystemInfoRpm.htm')
+        info = dict()
+        info["descriStr"] = re.search(r'descriStr\:\[(.*?)\]', info_body, flags=re.DOTALL).group(1).strip().strip('"')
+        info["macStr"] = re.search(r'macStr\:\[(.*?)\]', info_body, flags=re.DOTALL).group(1).strip().strip('"')
+        info["ipStr"] = re.search(r'ipStr\:\[(.*?)\]', info_body, flags=re.DOTALL).group(1).strip().strip('"')
+        info["netmaskStr"] = re.search(r'netmaskStr\:\[(.*?)\]', info_body, flags=re.DOTALL).group(1).strip().strip('"')
+        info["gatewayStr"] = re.search(r'gatewayStr\:\[(.*?)\]', info_body, flags=re.DOTALL).group(1).strip().strip('"')
+        info["firmwareStr"] = re.search(r'firmwareStr\:\[(.*?)\]', info_body, flags=re.DOTALL).group(1).strip().strip('"')
+        info["hardwareStr"] = re.search(r'hardwareStr\:\[(.*?)\]', info_body, flags=re.DOTALL).group(1).strip().strip('"')
+        self.logout()
+        return info
+
+    def get_statistics_influxdb(self):
+        statistics_influxdb = dict()
+        for port_stats in self.statistics:
+            statistics_influxdb[port_stats["port"]] = dict()
+            statistics_influxdb[port_stats["port"]]["source"] = self.info["descriStr"].replace(' ', r'\ ')
+            statistics_influxdb[port_stats["port"]]["ifDescr"] = ("Port " + str(port_stats["port"])).replace(' ', r'\ ')
+            statistics_influxdb[port_stats["port"]]["ifOperStatus"] = str(PORT_STATES_TO_INT[port_stats["state"]])+'i'
+            statistics_influxdb[port_stats["port"]]["ifSpeed"] = str(LINK_STATES_TO_INT[port_stats["link"]])+'i'
+            statistics_influxdb[port_stats["port"]]["ifOutOctets"] = str(port_stats["tx_ok"])+'i'
+            statistics_influxdb[port_stats["port"]]["ifOutErrors"] = str(port_stats["tx_err"])+'i'
+            statistics_influxdb[port_stats["port"]]["ifInOctets"] = str(port_stats["rx_ok"])+'i'
+            statistics_influxdb[port_stats["port"]]["ifInErrors"] = str(port_stats["rx_err"])+'i'
+        return dict(statistics_influxdb)
+
+    def print_statistics_influxdb(self):
+        out_text = ""
+        measurement = 'interface'
+        for id in self.statistics_influxdb:
+            if id:
+                tags = ["source", "ifDescr"]
+                tag_set = list()
+                for tag in tags:
+                    tag_set.append("{}={}".format(tag, self.statistics_influxdb[id][tag]))
+                fields = ["ifOperStatus", "ifSpeed", "ifOutOctets", "ifOutErrors", "ifInOctets", "ifInErrors"]
+                field_set = list()
+                for field in fields:
+                    field_set.append("{}={}".format(field, self.statistics_influxdb[id][field]))
+                out_text += measurement
+                out_text += ','
+                out_text += ','.join(tag_set)
+                out_text += ' '
+                out_text += ','.join(field_set)
+                out_text += '\n'
+        return out_text
 
     def login(self):
         self.session = requests.Session()
@@ -228,10 +291,11 @@ def main():
     argp.add_argument('-p', '--ports', default='all', help='comma separated list of ports to check')
     argp.add_argument('-w', '--warning', default='10', help='send and receive warning error count since last check')
     argp.add_argument('-c', '--critical', default='20', help='send and receive critical error count since last check')
+    argp.add_argument('--influxdb', default=False, action='store_true', help='Format for input into influxdb')
     args = argp.parse_args()
 
     md5 = hashlib.md5()
-    md5.update(str(args))
+    md5.update(str(args).encode())
     service_fingerprint = md5.hexdigest()
 
     if args.mode not in CHECK_MODES:
@@ -246,7 +310,7 @@ def main():
         sys.exit(3)
 
     if args.ports != 'all':
-        if not re.match('^(\d+\,{1})*\d+$', args.ports):
+        if not re.match(r'^(\d+\,{1})*\d+$', args.ports):
             print('UNKNOWN: ports must be given as comma separated list')
             sys.exit(3)
 
@@ -254,7 +318,11 @@ def main():
                     password=args.password, mode=args.mode, html=args.html, ports=args.ports,
                     warning=args.warning, critical=args.critical, service_fingerprint=service_fingerprint)
     result_code, result_text, result_perfdata = plugin.check()
-    print('%s: %s|%s' % (NAGIOS_STATS[result_code], result_text, result_perfdata))
+    if args.influxdb:
+        print(plugin.print_statistics_influxdb(), end='', flush=True)
+    else:
+        print('%s: %s|%s' % (NAGIOS_STATS[result_code], result_text, result_perfdata))
+
     sys.exit(result_code)
 
 if __name__ == '__main__':
