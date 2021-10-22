@@ -17,14 +17,14 @@
 #     You should have received a copy of the GNU General Public License
 #     along with check_tp-link_easysmart.  If not, see <http://www.gnu.org/licenses/>.
 
-import requests
-from requests import ConnectionError
-from requests.auth import HTTPBasicAuth
 import argparse
 import sys
 import re
 import hashlib
 import os
+import requests
+from requests import ConnectionError
+from requests.auth import HTTPBasicAuth
 
 CHECK_MODES = [
     'overview',
@@ -52,9 +52,6 @@ LINK_STATES = {
     5: '100MBit Full Duplex',
     6: '1000MBit Full Duplex',
 }
-
-
-
 
 class Plugin():
 
@@ -108,21 +105,21 @@ class Plugin():
                     f.write('%s,%s,%s,%s\n' % (element['tx_ok'], element['tx_err'], element['rx_ok'], element['rx_err']))
 
             port_nagios_status = 0
-            if tx_err  > self.warning or rx_err > self.warning:
+            if tx_err > self.warning or rx_err > self.warning:
                 port_nagios_status = 1
             if tx_err > self.critical or rx_err > self.critical:
                 port_nagios_status = 2
             if overall_status < port_nagios_status:
                 overall_status = port_nagios_status
             text += 'port %d %s (%s) TX OK: %d TX ERR: %d RX OK: %d RX ERR: %d (%s)' % (port['port'],
-                                                   port['state'],
-                                                   port['link'],
-                                                   tx_ok,
-                                                   tx_err,
-                                                   rx_ok,
-                                                   rx_err,
-                                                   NAGIOS_STATS[port_nagios_status]
-                                                   )
+                                                                                        port['state'],
+                                                                                        port['link'],
+                                                                                        tx_ok,
+                                                                                        tx_err,
+                                                                                        rx_ok,
+                                                                                        rx_err,
+                                                                                        NAGIOS_STATS[port_nagios_status]
+                                                                                        )
             if self.html:
                 text += '</br>'
             else:
@@ -138,13 +135,13 @@ class Plugin():
         perf = ''
         for port in self.statistics:
             text += 'port %d %s (%s) TX OK: %d TX ERR: %d RX OK: %d RX ERR: %d' % (port['port'],
-                                                   port['state'],
-                                                   port['link'],
-                                                   port['tx_ok'],
-                                                   port['tx_err'],
-                                                   port['rx_ok'],
-                                                   port['rx_err']
-                                                   )
+                                                                                   port['state'],
+                                                                                   port['link'],
+                                                                                   port['tx_ok'],
+                                                                                   port['tx_err'],
+                                                                                   port['rx_ok'],
+                                                                                   port['rx_err']
+                                                                                   )
             if self.html:
                 text += '</br>'
             else:
@@ -158,11 +155,11 @@ class Plugin():
     def get_statistics(self):
         self.login()
         statistics_body = self.make_request('PortStatisticsRpm.htm')
-        port_states = [int(i) for i in re.search('state\:\[(.*)\]\,\n', statistics_body).group(1).split(',')]
+        port_states = [int(i) for i in re.search(r'state\:\[(.*)\]\,\n', statistics_body).group(1).split(',')]
         del port_states[-2:]
-        port_links = [int(i) for i in re.search('link_status\:\[(.*)\]\,\n', statistics_body).group(1).split(',')]
+        port_links = [int(i) for i in re.search(r'link_status\:\[(.*)\]\,\n', statistics_body).group(1).split(',')]
         del port_links[-2:]
-        port_statistics = [int(i) for i in re.search('pkts\:\[(.*)\]\n', statistics_body).group(1).split(',')]
+        port_statistics = [int(i) for i in re.search(r'pkts\:\[(.*)\]\n', statistics_body).group(1).split(',')]
         del port_statistics[-2:]
         port_statistics = [port_statistics[i:i+4] for i in range(0, len(port_statistics), 4)]
         statistics = []
@@ -246,7 +243,7 @@ def main():
         sys.exit(3)
 
     if args.ports != 'all':
-        if not re.match('^(\d+\,{1})*\d+$', args.ports):
+        if not re.match(r'^(\d+\,{1})*\d+$', args.ports):
             print('UNKNOWN: ports must be given as comma separated list')
             sys.exit(3)
 
