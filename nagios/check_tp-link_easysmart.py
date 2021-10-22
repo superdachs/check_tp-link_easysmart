@@ -53,6 +53,22 @@ LINK_STATES = {
     6: '1000MBit Full Duplex',
 }
 
+LINK_STATES_TO_INT = {
+    'down' : 0,
+    'unknown' : 0,
+    '10MBit Half Duplex'  : int(10E6),
+    '10MBit Full Duplex'  : int(10E6),
+    '100MBit Half Duplex' : int(100E6),
+    '100MBit Full Duplex' : int(100E6),
+    '1000MBit Full Duplex': int(1000E6),
+}
+
+PORT_STATES_TO_INT = {
+    'disabled' : int(0),
+    'enabled' : int(1),
+}
+
+
 class Plugin():
 
     def __init__(self, hostaddress, username, password,
@@ -68,7 +84,8 @@ class Plugin():
         self.critical = critical
         self.service_fingerprint = service_fingerprint
         self.statistics = self.get_statistics()
-
+        self.info = self.get_info()
+        self.statistics_influxdb = self.get_statistics_influxdb()
 
     def check(self):
         return getattr(self, 'check_%s' % self.mode)()
@@ -177,6 +194,55 @@ class Plugin():
         self.logout()
         return statistics
 
+    def get_info(self):
+        self.login()
+        info_body = self.make_request('SystemInfoRpm.htm')
+        info = dict()
+        info["descriStr"] = re.search(r'descriStr\:\[(.*?)\]', info_body, flags=re.DOTALL).group(1).strip().strip('"')
+        info["macStr"] = re.search(r'macStr\:\[(.*?)\]', info_body, flags=re.DOTALL).group(1).strip().strip('"')
+        info["ipStr"] = re.search(r'ipStr\:\[(.*?)\]', info_body, flags=re.DOTALL).group(1).strip().strip('"')
+        info["netmaskStr"] = re.search(r'netmaskStr\:\[(.*?)\]', info_body, flags=re.DOTALL).group(1).strip().strip('"')
+        info["gatewayStr"] = re.search(r'gatewayStr\:\[(.*?)\]', info_body, flags=re.DOTALL).group(1).strip().strip('"')
+        info["firmwareStr"] = re.search(r'firmwareStr\:\[(.*?)\]', info_body, flags=re.DOTALL).group(1).strip().strip('"')
+        info["hardwareStr"] = re.search(r'hardwareStr\:\[(.*?)\]', info_body, flags=re.DOTALL).group(1).strip().strip('"')
+        self.logout()
+        return info
+
+    def get_statistics_influxdb(self):
+        statistics_influxdb = dict()
+        for port_stats in self.statistics:
+            statistics_influxdb[port_stats["port"]] = dict()
+            statistics_influxdb[port_stats["port"]]["source"] = self.info["descriStr"].replace(' ', r'\ ')
+            statistics_influxdb[port_stats["port"]]["ifDescr"] = ("Port " + str(port_stats["port"])).replace(' ', r'\ ')
+            statistics_influxdb[port_stats["port"]]["ifOperStatus"] = str(PORT_STATES_TO_INT[port_stats["state"]])+'i'
+            statistics_influxdb[port_stats["port"]]["ifSpeed"] = str(LINK_STATES_TO_INT[port_stats["link"]])+'i'
+            statistics_influxdb[port_stats["port"]]["ifOutOctets"] = str(port_stats["tx_ok"])+'i'
+            statistics_influxdb[port_stats["port"]]["ifOutErrors"] = str(port_stats["tx_err"])+'i'
+            statistics_influxdb[port_stats["port"]]["ifInOctets"] = str(port_stats["rx_ok"])+'i'
+            statistics_influxdb[port_stats["port"]]["ifInErrors"] = str(port_stats["rx_err"])+'i'
+        return dict(statistics_influxdb)
+
+    def print_statistics_influxdb(self):
+        out_text = ""
+        measurement = 'interface'
+        for id in self.statistics_influxdb:
+            if id:
+                tags = ["source", "ifDescr"]
+                tag_set = list()
+                for tag in tags:
+                    tag_set.append("{}={}".format(tag, self.statistics_influxdb[id][tag]))
+                fields = ["ifOperStatus", "ifSpeed", "ifOutOctets", "ifOutErrors", "ifInOctets", "ifInErrors"]
+                field_set = list()
+                for field in fields:
+                    field_set.append("{}={}".format(field, self.statistics_influxdb[id][field]))
+                out_text += measurement
+                out_text += ','
+                out_text += ','.join(tag_set)
+                out_text += ' '
+                out_text += ','.join(field_set)
+                out_text += '\n'
+        return out_text
+
     def login(self):
         self.session = requests.Session()
         login_payload = {
@@ -225,6 +291,7 @@ def main():
     argp.add_argument('-p', '--ports', default='all', help='comma separated list of ports to check')
     argp.add_argument('-w', '--warning', default='10', help='send and receive warning error count since last check')
     argp.add_argument('-c', '--critical', default='20', help='send and receive critical error count since last check')
+    argp.add_argument('--influxdb', default=False, action='store_true', help='Format for input into influxdb')
     args = argp.parse_args()
 
     md5 = hashlib.md5()
@@ -251,7 +318,11 @@ def main():
                     password=args.password, mode=args.mode, html=args.html, ports=args.ports,
                     warning=args.warning, critical=args.critical, service_fingerprint=service_fingerprint)
     result_code, result_text, result_perfdata = plugin.check()
-    print('%s: %s|%s' % (NAGIOS_STATS[result_code], result_text, result_perfdata))
+    if args.influxdb:
+        print(plugin.print_statistics_influxdb(), end='', flush=True)
+    else:
+        print('%s: %s|%s' % (NAGIOS_STATS[result_code], result_text, result_perfdata))
+
     sys.exit(result_code)
 
 if __name__ == '__main__':
