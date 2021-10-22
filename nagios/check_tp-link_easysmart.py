@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 #     2019 Stefan Kauerauf <mail@stefankauerauf.de>
 #     last modified: 2/5/2019
@@ -231,7 +231,7 @@ def main():
     args = argp.parse_args()
 
     md5 = hashlib.md5()
-    md5.update(str(args))
+    md5.update(str(args).encode())
     service_fingerprint = md5.hexdigest()
 
     if args.mode not in CHECK_MODES:
